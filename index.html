@@ -135,28 +135,40 @@ function searchPlaces(rawText) {
     const noPref = name.replace(/^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/, "");
     return noPref && t.includes(noPref) ? { name: noPref, level: 2 } : null;
   });
-  return res.sort((a, b) => a.level - b.level || b.name.length - a.name.length).slice(0, 12);
+  return res.sort((a, b) => a.level - b.level || b.name.length - a.name.length).slice(0, 200);
 }
 
 function searchCityLevel(rawText) {  // 町域が読めなかった場合の市区町村フォールバック
   const t = normalize(rawText);
   const hits = new Map();
+  let maxMlen = 0;
   for (const [zip, name] of PLACES) {
     const city = name.replace(/^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/, "")
                      .split(/(?=[^都道府県]$)|(?<=市)|(?<=区)|(?<=町)|(?<=村)/)[0] || name;
-    const m = name.match(/^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)(.+?(?:市|区|町|村))(.*)$/);
-    if (!m) continue;
-    const cityPart = m[2];
-    if (cityPart && t.includes(cityPart)) {
+    const noPref = name.replace(/^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/, "");
+    let best = "";
+    for (let i = 0; i < noPref.length; i++) {   // 市/区/町/村で終わる最長の一致部
+      if ("市区町村".includes(noPref[i])) {
+        const p = noPref.slice(0, i + 1);
+        if (t.includes(p) && p.length > best.length) best = p;
+      }
+    }
+    if (best) {
       const cur = hits.get(zip);
-      if (!cur || cityPart.length > cur.mlen) hits.set(zip, { name, mlen: cityPart.length, level: 3 });
+      if (!cur || best.length > cur.mlen) hits.set(zip, { name, mlen: best.length, level: 3 });
+      if (best.length > maxMlen) maxMlen = best.length;
     }
   }
-  return [...hits.entries()].map(([zip, v]) => ({ zip, ...v })).sort((a, b) => b.mlen - a.mlen || a.name.localeCompare(b.name)).slice(0, 12);
+  return [...hits.entries()].map(([zip, v]) => v.mlen === maxMlen ? { zip, ...v } : null)
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name)).slice(0, 200);
 }
 
 /* ---------- 表示 ---------- */
-function show(list) {
+let CURRENT = [];
+function show(list) { CURRENT = list || []; renderCands(12); }
+function renderCands(n) {
+  const list = CURRENT;
   if (!list.length) { $("result").innerHTML = `<div class="card">該当する地名が見つかりませんでした。手動検索をお試しください。</div>`; return; }
   const fmt = z => `〒${z.slice(0,3)}-${z.slice(3)}`;
   const top = list[0];
@@ -164,9 +176,17 @@ function show(list) {
     <div class="addr">${top.name}</div>
     <div class="note">${top.level >= 3 ? "※市区町村レベル(該当する町域から選択できます)" : "※OCR認識結果からの照会"}</div></div>`;
   const rest = list.slice(1);
-  if (rest.length) html += `<div class="card"><div class="note">他の候補(タップで表示)</div>` +
-    rest.map(c => `<div class="cand" onclick="pick('${c.zip}','${c.name}')">${c.name}<b>${fmt(c.zip)}</b></div>`).join("") + `</div>`;
+  if (rest.length) {
+    const vis = rest.slice(0, Math.max(0, n - 1));
+    const hidden = rest.length - vis.length;
+    html += `<div class="card"><div class="note">他の候補(タップで表示)</div>` +
+      vis.map(c => `<div class="cand" onclick="pick('${c.zip}','${c.name}')">${c.name}<b>${fmt(c.zip)}</b></div>`).join("") +
+      (hidden > 0 ? `<div class="btnrow" style="padding:6px 0 0"><button id="more" class="ghost">さらに表示(残り${hidden}件)</button></div>` : ``) +
+      `</div>`;
+  }
   $("result").innerHTML = html;
+  const mb = document.getElementById("more");
+  if (mb) mb.onclick = () => renderCands(n + 30);
 }
 function pick(zip, name) {
   show([{ zip, name, level: 1 }, ...[]]);
@@ -210,7 +230,8 @@ $("reset").onclick = () => {
   $("manual").value = "";
   $("raw").textContent = "(なし)";
   if (!camOn) { camOn = true; $("camoff").textContent = "📷 停止"; startCamera(); }
-  document.querySelectorAll("details").forEach(d => { d.removeAttribute("open"); });
+  CURRENT = [];
+  const md = $("manual"); if (md) md.closest("details").setAttribute("open", "");
   window.scrollTo({ top: 0, behavior: "smooth" });
   status("リセットしました");
 };
