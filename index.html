@@ -15,12 +15,12 @@ window.__OCR_READY = (async () => {
   return Tesseract.createWorker("jpn", 1, {
     workerPath: wURL, workerBlobURL: false,
     corePath: cURL + "#.js",
-    langPath: "./lang/",
+    langPath: new URL("lang/", location.href).href,
     gzip: true, cache: false,
     logger: m => { if (m.status === "recognizing text")
       document.getElementById("busyMsg").textContent = `認識中 ${Math.round(m.progress * 100)}%`; }
   });
-})();
+})().catch(e => Tesseract.createWorker("jpn", 1, {}));
 </script>
 <style>
   :root { --accent:#0a6cff; --bg:#f4f6fa; --card:#fff; --txt:#1b2430; --sub:#68788f; }
@@ -104,10 +104,10 @@ function normalize(s) {
 }
 async function loadData() {
   const bin = Uint8Array.from(atob(DATA_B64), c => c.charCodeAt(0));
-  const stream = new Response(bin.blob().stream().pipeThrough(new DecompressionStream("gzip")));
+  const stream = new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream("gzip")));
   const text = await stream.text();
   PLACES = text.split("\n").map(l => { const i = l.indexOf("|");
-    return [l.slice(0, 7), l.slice(7)]; });
+    return [l.slice(0, i), l.slice(i + 1)]; });
   status(`データ準備完了(${PLACES.length.toLocaleString()}件)`);
 }
 
@@ -176,6 +176,7 @@ async function startCamera() {
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: facing }, width: { ideal: 1920 } }, audio: false });
     $("cam").srcObject = stream;
+    $("cam").play && $("cam").play().catch(() => {});
     $("cammsg").style.display = "none";
     $("shot").disabled = false;
     status(`カメラ起動 OK`);
@@ -214,6 +215,7 @@ $("shot").onclick = async () => {
 };
 
 /* ---------- 手動検索 ---------- */
+$("manual").addEventListener("keydown", e => { if (e.key === "Enter") $("mgo").click(); });
 $("mgo").onclick = () => {
   const v = $("manual").value;
   if (!v.trim()) return;
@@ -224,15 +226,16 @@ $("mgo").onclick = () => {
 
 /* ---------- 起動 ---------- */
 (async () => {
-  if (typeof DecompressionStream === "undefined") {
-    status("このブラウザは非対応です(iOS 16.4以上でお試しください)。"); return;
-  }
-  await loadData();
-  status(status.textContent + " / OCR初期化中…");
-  await window.__OCR_READY;
   await startCamera();
-  status(status.textContent + " / OCRモデル内蔵・オフライン動作");
+  try {
+    await loadData();
+  } catch (e) { status("データ展開エラー: " + (e && e.message || e)); }
+  try {
+    await window.__OCR_READY;
+    status(status.textContent + " / OCR準備完了・オフライン動作");
+  } catch (e) { status(status.textContent + " / ⚠OCR初期化失敗: " + (e && e.message || e) + "(手動検索は使えます)"); }
 })();
 </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
