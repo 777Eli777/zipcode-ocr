@@ -84,7 +84,7 @@ window.__OCR_READY = (async () => {
   <div class="btnrow" style="padding:8px 0 0"><button id="mgo">検索</button></div></div>
 </details>
 
-<details><summary>OCRの生テキスト</summary><pre id="raw">(なし)</pre></details>
+<details><summary>読み取り結果</summary><pre id="raw">(なし)</pre></details>
 
 <div id="busy"><div class="spin"></div><div id="busyMsg">処理中…</div></div>
 
@@ -145,10 +145,10 @@ function searchCityLevel(rawText) {  // 町域が読めなかった場合の市�
     const cityPart = m[2];
     if (cityPart && t.includes(cityPart)) {
       const cur = hits.get(zip);
-      if (!cur || cityPart.length > cur.name.length) hits.set(zip, { name: cityPart, level: 3 });
+      if (!cur || cityPart.length > cur.mlen) hits.set(zip, { name, mlen: cityPart.length, level: 3 });
     }
   }
-  return [...hits.entries()].map(([zip, v]) => ({ zip, ...v })).sort((a, b) => b.name.length - a.name.length).slice(0, 12);
+  return [...hits.entries()].map(([zip, v]) => ({ zip, ...v })).sort((a, b) => b.mlen - a.mlen || a.name.localeCompare(b.name)).slice(0, 12);
 }
 
 /* ---------- 表示 ---------- */
@@ -158,7 +158,7 @@ function show(list) {
   const top = list[0];
   let html = `<div class="card"><div class="zip">${fmt(top.zip)}</div>
     <div class="addr">${top.name}</div>
-    <div class="note">${top.level >= 3 ? "※市区町村レベルの郵便番号(町域は未特定)" : "※OCR認識結果からの照会"}</div></div>`;
+    <div class="note">${top.level >= 3 ? "※市区町村レベル(該当する町域から選択できます)" : "※OCR認識結果からの照会"}</div></div>`;
   const rest = list.slice(1);
   if (rest.length) html += `<div class="card"><div class="note">他の候補(タップで表示)</div>` +
     rest.map(c => `<div class="cand" onclick="pick('${c.zip}','${c.name}')">${c.name}<b>${fmt(c.zip)}</b></div>`).join("") + `</div>`;
