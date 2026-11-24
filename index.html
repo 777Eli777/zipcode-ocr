@@ -72,12 +72,12 @@ window.__OCR_READY = (async () => {
 </div>
 
 <div class="btnrow">
-  <button id="shot" disabled>読み取る</button>
-  <button id="flip" class="ghost">切替</button>
+  <button id="shot" disabled style="padding:18px; font-size:18px;">読み取る</button>
 </div>
 <div class="btnrow" style="padding-top:0">
-  <button id="camoff" class="ghost">📷 停止</button>
-  <button id="reset" class="ghost">↺ リセット</button>
+  <button id="flip" class="ghost" style="padding:12px 4px; font-size:14px;">📷切替</button>
+  <button id="camoff" class="ghost" style="padding:12px 4px; font-size:14px;">📷停止</button>
+  <button id="reset" class="ghost" style="padding:12px 4px; font-size:14px;">↺リセット</button>
 </div>
 
 <div id="result"></div>
@@ -85,7 +85,10 @@ window.__OCR_READY = (async () => {
 <details style="margin:4px 16px">
   <summary>手動検索</summary>
   <div class="card"><input id="manual" placeholder="例: 東京都千代田区千代田">
-  <div class="btnrow" style="padding:8px 0 0"><button id="mgo">検索</button></div></div>
+  <div class="btnrow" style="padding:8px 0 0">
+    <button id="mgo">検索</button>
+    <button id="mreset" style="flex:0 0 auto; padding:12px 16px; font-size:14px; background:#e3e9f2; color:#68788f;">リセット</button>
+  </div></div>
 </details>
 
 <details><summary>読み取り結果</summary><pre id="raw">(なし)</pre></details>
@@ -214,7 +217,7 @@ $("flip").onclick = () => { facing = facing === "environment" ? "user" : "enviro
 let camOn = true;
 $("camoff").onclick = () => {
   camOn = !camOn;
-  if (camOn) { startCamera(); $("camoff").textContent = "📷 停止"; }
+  if (camOn) { startCamera(); $("camoff").textContent = "📷停止"; }
   else {
     if (stream) stream.getTracks().forEach(t => t.stop());
     $("cam").srcObject = null;
@@ -225,11 +228,19 @@ $("camoff").onclick = () => {
   }
 };
 
+$("mreset").onclick = () => {
+  $("result").innerHTML = "";
+  $("manual").value = "";
+  $("raw").textContent = "(なし)";
+  CURRENT = [];
+  $("manual").focus();
+};
+
 $("reset").onclick = () => {
   $("result").innerHTML = "";
   $("manual").value = "";
   $("raw").textContent = "(なし)";
-  if (!camOn) { camOn = true; $("camoff").textContent = "📷 停止"; startCamera(); }
+  if (!camOn) { camOn = true; $("camoff").textContent = "📷停止"; startCamera(); }
   CURRENT = [];
   const md = $("manual"); if (md) md.closest("details").setAttribute("open", "");
   window.scrollTo({ top: 0, behavior: "smooth" });
