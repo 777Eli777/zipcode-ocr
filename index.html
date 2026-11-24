@@ -75,6 +75,10 @@ window.__OCR_READY = (async () => {
   <button id="shot" disabled>読み取る</button>
   <button id="flip" class="ghost">切替</button>
 </div>
+<div class="btnrow" style="padding-top:0">
+  <button id="camoff" class="ghost">📷 停止</button>
+  <button id="reset" class="ghost">↺ リセット</button>
+</div>
 
 <div id="result"></div>
 
@@ -187,6 +191,30 @@ async function startCamera() {
 }
 $("flip").onclick = () => { facing = facing === "environment" ? "user" : "environment"; startCamera(); };
 
+let camOn = true;
+$("camoff").onclick = () => {
+  camOn = !camOn;
+  if (camOn) { startCamera(); $("camoff").textContent = "📷 停止"; }
+  else {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    $("cam").srcObject = null;
+    $("cammsg").style.display = "flex";
+    $("cammsg").textContent = "📷 カメラを停止中(📷 停止ボタンで再開)";
+    $("camoff").textContent = "📷 再開";
+    status("カメラ停止中 / 手動検索は使えます");
+  }
+};
+
+$("reset").onclick = () => {
+  $("result").innerHTML = "";
+  $("manual").value = "";
+  $("raw").textContent = "(なし)";
+  if (!camOn) { camOn = true; $("camoff").textContent = "📷 停止"; startCamera(); }
+  document.querySelectorAll("details").forEach(d => { d.removeAttribute("open"); });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  status("リセットしました");
+};
+
 /* ---------- 撮影→前処理→OCR→照会 ---------- */
 $("shot").onclick = async () => {
   busy(true); $("busyMsg").textContent = "画像を処理中…";
@@ -222,6 +250,7 @@ $("mgo").onclick = () => {
   let list = searchPlaces(v);
   if (!list.length) list = searchCityLevel(v);
   show(list);
+  window.scrollTo({ top: 0, behavior: "smooth" });
 };
 
 /* ---------- 起動 ---------- */
