@@ -145,13 +145,17 @@ function searchPlaces(rawText) {
     const keys = [noPref];
     for (let i = 0; i < noPref.length; i++)
       if ("市区町村".includes(noPref[i])) keys.push(noPref.slice(i + 1));
+    if (/丁目$/.test(noPref)) {                          // 「中区栄四丁目」→「中区栄」でも照合可
+      const base = noPref.replace(/\d+丁目$/, "").replace(/[一二三四五六七八九十]+丁目$/, "");
+      if (base !== noPref) keys.unshift(base);
+    }
     let best = null;
     for (const k of keys)
       if (k.length >= 2 && t.includes(k) && (!best || k.length > best.name.length))
         best = { name: k, level: 2.5 };
     return best;
   });
-  return res.sort((a, b) => a.level - b.level || b.name.length - a.name.length).slice(0, 200);
+  return res.sort((a, b) => a.level - b.level || b.name.length - a.name.length || a.name.localeCompare(b.name, 'ja')).slice(0, 200);
 }
 
 function searchCityLevel(rawText) {  // 町域が読めなかった場合の市区町村フォールバック
