@@ -135,27 +135,33 @@ function searchPlaces(rawText) {
     }
     return [...hits.entries()].map(([zip, v]) => ({ zip, ...v }));
   };
-  let res = pass((t, name) => t.includes(name.replace(/（[^）]*$/g, "")) ? { name, level: 1 } : null);
+  let res = pass((t, name) => t.includes(name.replace(/（[^）]*$/g, "")) ? { name, full: name, pre: 1, level: 1 } : null);
   if (!res.length) res = pass((t, name) => {           // 県名の誤読に備え市区町村+町域
     const noPref = name.replace(/^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/, "").replace(/（[^）]*$/g, "");
-    return noPref && t.includes(noPref) ? { name: noPref, level: 2 } : null;
+    return noPref && t.includes(noPref) ? { name: noPref, full: name, pre: 1, level: 2 } : null;
   });
   if (!res.length) res = pass((t, name) => {           // 町域のみ・区+町域でも検索可
     const noPref = name.replace(/^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/, "").replace(/（[^）]*$/g, "");
     const keys = [noPref];
     for (let i = 0; i < noPref.length; i++)
-      if ("市区町村".includes(noPref[i])) keys.push(noPref.slice(i + 1));
+      if ("市区町村".includes(noPref[i])) {
+        const suf = noPref.slice(i + 1);
+        if (!/^[0-9一二三四五六七八九十]+丁目$/.test(suf)) keys.push(suf);  // 「四丁目」だけの断片は照合キーにしない
+      }
     if (/丁目$/.test(noPref)) {                          // 「中区栄四丁目」→「中区栄」でも照合可
       const base = noPref.replace(/\d+丁目$/, "").replace(/[一二三四五六七八九十]+丁目$/, "");
       if (base !== noPref) keys.unshift(base);
     }
     let best = null;
-    for (const k of keys)
-      if (k.length >= 2 && t.includes(k) && (!best || k.length > best.name.length))
-        best = { name: k, level: 2.5 };
+    for (const k of keys) {
+      if (k.length < 2 || !t.includes(k)) continue;
+      const pre = noPref.startsWith(k) ? 1 : 0;          // 町域の語頭一致を優先(語尾の「四丁目」等を後ろへ)
+      if (!best || pre > best.pre || (pre === best.pre && k.length > best.name.length))
+        best = { name: k, full: name, pre, level: 2.5 };
+    }
     return best;
   });
-  return res.sort((a, b) => a.level - b.level || b.name.length - a.name.length || a.name.localeCompare(b.name, 'ja')).slice(0, 200);
+  return res.sort((a, b) => a.level - b.level || (b.pre ?? 1) - (a.pre ?? 1) || b.name.length - a.name.length || a.name.localeCompare(b.name, 'ja')).slice(0, 200);
 }
 
 function searchCityLevel(rawText) {  // 町域が読めなかった場合の市区町村フォールバック
@@ -202,9 +208,10 @@ function renderCands(n) {
   if (!list.length) { $("result").innerHTML = `<div class="card">該当する地名が見つかりませんでした。手動検索をお試しください。</div>`; return; }
   const fmt = z => `〒${z.slice(0,3)}-${z.slice(3)}`;
   const top = list[0];
-  const sc = sortCodeOf(top.name);
+  const disp = top.full || top.name;
+  const sc = sortCodeOf(disp);
   let html = `<div class="card"><div class="zip">${fmt(top.zip)}</div>
-    <div class="addr">${top.name}</div>
+    <div class="addr">${disp}</div>
     ${sc ? `<div style="font-size:22px;font-weight:700;color:#0a6cff;margin-top:6px">仕分コード: ${sc}</div>` : `<div class="note" style="color:#c0392b">仕分コード未登録</div>`}
     <div class="note">${top.level >= 3 ? "※市区町村レベル(該当する町域から選択できます)" : "※OCR認識結果からの照会"}</div></div>`;
   const rest = list.slice(1);
